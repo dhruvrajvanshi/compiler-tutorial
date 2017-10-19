@@ -4,7 +4,10 @@ type Expression
     | { type: "Var", name: string }
     | { type: "Function", param: string, body: Expression }
     | { type: "Call", func: Expression, arg: Expression }
-    | { type: "If", cond: Expression, trueBranch: Expression, falseBranch };
+    | { type: "If"
+      , cond: Expression
+      , trueBranch: Expression
+      , falseBranch: Expression };
 
 type Type
     = { type: "Named", name: string }
