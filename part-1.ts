@@ -1,18 +1,24 @@
 
-type Expression
-    = { nodeType: "Int", value: number }
-    | { nodeType: "Var", name: string }
-    | { nodeType: "Function", param: string, body: Expression }
-    | { nodeType: "Call", func: Expression, arg: Expression }
-    | { nodeType: "If"
-      , cond: Expression
-      , trueBranch: Expression
-      , falseBranch: Expression };
+type Expression = EInt | EVar | EFunc | ECall | EIf;
+interface EInt
+    { nodeType: "Int", value: number }
+interface EVar
+    { nodeType: "Var", name: string }
+interface EFunc
+    { nodeType: "Function", param: string, body: Expression }
+interface ECall
+    { nodeType: "Call", func: Expression, arg: Expression }
+interface EIf {
+    nodeType: "If",
+    cond: Expression,
+    trueBranch: Expression,
+    falseBranch: Expression
+};
 
-type Type
-    = { nodeType: "Named", name: string }
-    | { nodeType: "Var", name: string }
-    | { nodeType: "Function", from: Type, to: Type };
+type Type = TNamed | TVar | TFun;
+interface TNamed { nodeType: "Named", name: string }
+interface TVar { nodeType: "Var", name: string }
+interface TFun { nodeType: "Function", from: Type, to: Type };
 
 type Context = {
     next: number;
@@ -50,7 +56,7 @@ function unify(t1: Type, t2: Type): Substitution {
         const s2 = unify(t1.to, t2.to);
         return Object.assign({}, s1, s2);
     } else {
-        throw `Type mismatch between ${typeToString(t1)} and ${typeToString(t2)}`;
+        throw `Type mismatch:\n    Expected ${typeToString(t1)}\n    Found ${typeToString(t2)}`;
     }
 }
 
@@ -101,7 +107,7 @@ function addToContext(ctx: Context, name: string, type: Type): Context {
     return newEnv;
 }
 
-function newTVar(ctx: Context): Type {
+function newTVar(ctx: Context): TVar {
     const newVarNum = ctx.next;
     ctx.next++;
     return {
@@ -157,12 +163,17 @@ function infer(ctx: Context, e: Expression): [Type, Substitution] {
     case "Call":
         {
             const [funcType, s1] = infer(ctx, e.func);
-            if (funcType.nodeType !== "Function") {
-                throw `Expected a function; Got ${typeToString(funcType)}`;
-            }
             const [argType, s2] = infer(applySubstToCtx(s1, ctx), e.arg);
-            const resultSubst = Object.assign({}, unify(funcType.from, argType), s1, s2);
-            return [applySubstToType(resultSubst, funcType.to), resultSubst];
+            const newVar = newTVar(ctx);
+            const s3 = unify({
+                nodeType: "Function",
+                from: argType,
+                to: newVar
+            }, funcType);
+            const s4 = Object.assign({}, s1, s2, s3);
+            const s5 = unify(applySubstToType(s4, (funcType as TFun).from), argType);
+            const resultSubst = Object.assign({}, s4, s5);
+            return [applySubstToType(resultSubst, (funcType as TFun).to), resultSubst];
         }
     }
 }
@@ -196,7 +207,7 @@ console.log(
         }
     },
         c("&&",
-          c("Int==", i(2), i(3)),
+          c("true", i(2), i(3)),
           c("Bool==", "true", "false")
         ),
     )[0]
