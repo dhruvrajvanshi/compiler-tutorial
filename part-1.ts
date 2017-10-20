@@ -53,7 +53,10 @@ function unify(t1: Type, t2: Type): Substitution {
         return varBind(t2.name, t1);
     } else if (t1.nodeType === "Function" && t2.nodeType === "Function") {
         const s1 = unify(t1.from, t2.from);
-        const s2 = unify(t1.to, t2.to);
+        const s2 = unify(
+            applySubstToType(s1, t1.to),
+            applySubstToType(s1, t2.to)
+        );
         return Object.assign({}, s1, s2);
     } else {
         throw `Type mismatch:\n    Expected ${typeToString(t1)}\n    Found ${typeToString(t2)}`;
