@@ -70,7 +70,7 @@ function unify(t1: Type, t2: Type): Substitution {
             applySubstToType(s1, t1.to),
             applySubstToType(s1, t2.to)
         );
-        return Object.assign({}, s1, s2);
+        return composeSubst(s1, s2);
     } else {
         throw `Type mismatch:\n    Expected ${typeToString(t1)}\n    Found ${typeToString(t2)}`;
     }
@@ -94,6 +94,15 @@ function contains(t: Type, name: string): boolean {
     case "Var": return t.name === name;
     case "Function": return contains(t.from, name) || contains(t.to, name);
     }
+}
+
+function composeSubst(s1: Substitution, s2: Substitution): Substitution {
+    const result: Substitution = {};
+    for (const k in s2) {
+        const type = s2[k];
+        result[k] = applySubstToType(s1, type);
+    };
+    return { ...s1, ...result };
 }
 
 function applySubstToType(subst: Substitution, type: Type): Type {
@@ -276,17 +285,17 @@ function inferIf(ctx: Context, e: EIf): [Type, Substitution] {
         nodeType: "Named",
         name: "Bool"
     });
-    const ctx1 = applySubstToCtx(Object.assign({}, s0, s1), ctx);
+    const ctx1 = applySubstToCtx(composeSubst(s0, s1), ctx);
     const [_trueBranchType, s2] = infer(ctx1, e.trueBranch);
-    const s3 = Object.assign({}, s1, s2);
+    const s3 = composeSubst(s1, s2);
     const ctx2 = applySubstToCtx(s2, ctx1);
     const [_falseBranchType, s4] = infer(ctx2, e.falseBranch);
-    const s5 = Object.assign({}, s3, s4);
+    const s5 = composeSubst(s3, s4);
 
     const trueBranchType = applySubstToType(s5, _trueBranchType);
     const falseBranchType = applySubstToType(s5, _falseBranchType);
     const s6 = unify(trueBranchType, falseBranchType);
-    const resultSubst = Object.assign({}, s5, s6);
+    const resultSubst = composeSubst(s5, s6);
     return [
         applySubstToType(s6, trueBranchType),
         s6
@@ -297,14 +306,15 @@ function inferCall(ctx: Context, e: ECall): [Type, Substitution] {
     const [funcType, s1] = infer(ctx, e.func);
     const [argType, s2] = infer(applySubstToCtx(s1, ctx), e.arg);
     const newVar = newTVar(ctx);
-    const s3 = unify({
+    const s3 = composeSubst(s1, s2);
+    const s4 = unify({
         nodeType: "Function",
         from: argType,
         to: newVar
     }, funcType);
-    const s4 = Object.assign({}, s1, s2, s3);
-    const s5 = unify(applySubstToType(s4, (funcType as TFun).from), argType);
-    const resultSubst = Object.assign({}, s4, s5);
+    const s5 = composeSubst(s3, s4);
+    const s6 = unify(applySubstToType(s5, (funcType as TFun).from), argType);
+    const resultSubst = composeSubst(s5, s6);
     return [applySubstToType(resultSubst, (funcType as TFun).to), resultSubst];
 }
 
